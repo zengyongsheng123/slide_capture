@@ -1,0 +1,5 @@
+train: datasets/train/images # train images (relative to 'path') 128 images
+val: datasets/val/images # val images (relative to 'path') 128 images
+
+nc: 1
+names: ["target"]
