@@ -1,34 +1,84 @@
-'''
-@File:Main.py
-@Autho:南宫啸天
-@Date:2025/6/3 23:22 
-'''
+import json
+import re
+import os
 import requests
-
+import time
 
 headers = {
-    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+    "Accept": "*/*",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-    "Cache-Control": "no-cache",
     "Connection": "keep-alive",
-    "Pragma": "no-cache",
-    "Referer": "https://turing.captcha.gtimg.com/",
-    "Sec-Fetch-Dest": "image",
-    "Sec-Fetch-Mode": "no-cors",
+    "Origin": "https://www.ishumei.com",
+    "Referer": "https://www.ishumei.com/trial/captcha.html",
+    "Sec-Fetch-Dest": "script",
+    "Sec-Fetch-Mode": "cors",
     "Sec-Fetch-Site": "cross-site",
-    "Sec-Fetch-Storage-Access": "active",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0",
-    "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Microsoft Edge\";v=\"134\"",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0",
+    "sec-ch-ua": "\"Microsoft Edge\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"",
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": "\"Windows\""
 }
-url = "https://turing.captcha.qcloud.com/cap_union_new_getcapbysig"
-params = {
-    "img_index": "1",
-    "image": "0279050000747219000000098d20e17d4118",
-    "sess": "s0jbKLCxqyMudh1wyo9NDfdDf7xN8nwmKMtyTMN7U0zBAbicIcbL5kfYL77yfutarYmdrp99CDkc2FBDld1oND5OdI-U4qprc5sId6N-lO1N0Orc8b3HCou4VfpHFdZBlZiXZK_yGscounemHEigBfN97UeUTJxxgPYFlvpgk_eTJhobYuvL0_laFpf3RARLTuZbeUe_NFgNc3d4OY7d6x3T541WajGixRlunt5bZzvVidFhSPJLyeMgzdF3COsEnn2CCEe1-TtLyuV4z4bw6dUZm6VBBXi18GIXXbK1YzRdK3pVaBIOFmuQ1dDinvvTN2GSyjUqtY-eEVJU4v4iCKMXYWIqI5KJlOV0h82JF-3m8Qr4PNh1ZtU8pHqyE1it-QZzBECkd1jGkYsM1emTsDoKkOFHYOojLyLMljlxJvMhg*"
-}
-response = requests.get(url, headers=headers, params=params)
 
-with open("test9.png", "wb") as f:
-    f.write(response.content)
+base_url = "https://captcha1.fengkongcloud.cn/ca/v1/register"
+output_dir = "imgs"
+
+# 创建目录
+os.makedirs(output_dir, exist_ok=True)
+
+
+def fetch_captcha_bg(captcha_uuid):
+    """获取验证码背景图URL"""
+    params = {
+        "lang": "zh-cn",
+        "rversion": "1.0.4",
+        "data": "{}",
+        "callback": f"sm_{int(time.time() * 1000)}",  # 动态生成callback
+        "organization": "d6tpAY1oV0Kv5jRSgxQr",
+        "sdkver": "1.1.3",
+        "appId": "default",
+        "model": "slide",
+        "captchaUuid": captcha_uuid,  # 每次使用不同的UUID
+        "channel": "DEFAULT"
+    }
+
+    try:
+        response = requests.get(base_url, headers=headers, params=params)
+        response.raise_for_status()
+
+        # 提取JSON数据
+        match = re.search(r'sm_\d+\((.*?)\)', response.text)
+        if not match:
+            return None
+
+        json_data = json.loads(match.group(1))
+        bg_url = "https://castatic.fengkongcloud.cn" + json_data["detail"]["bg"]
+        return bg_url
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+
+def download_images(num_images=200):
+    """下载指定数量的验证码图片"""
+    for i in range(num_images):
+        # 生成不同的captchaUuid（可以用时间戳+随机数）
+        captcha_uuid = f"captcha_{int(time.time())}_{i}"
+
+        bg_url = fetch_captcha_bg(captcha_uuid)
+        if not bg_url:
+            print(f"第 {i + 1} 张图片获取失败")
+            continue
+
+        try:
+            img_data = requests.get(bg_url).content
+            with open(f"{output_dir}/{i + 1}.jpg", "wb") as f:
+                f.write(img_data)
+            print(f"已下载第 {i + 1} 张图片: {bg_url}")
+        except Exception as e:
+            print(f"下载失败: {e}")
+
+        time.sleep(1)  # 避免请求过快被封
+
+
+if __name__ == "__main__":
+    download_images(200)  # 下载200张不同的验证码图片
